@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Churn Signal — Prediksi & Penjelasan Risiko Pelanggan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #E9EEE3;
+    --paper-raised: #F4F7EE;
+    --ink: #1F2A22;
+    --ink-soft: #4B5A4C;
+    --rule: #C7D0BC;
+    --teal: #2C6E71;
+    --teal-soft: #DCE9E6;
+    --coral: #B8503C;
+    --coral-soft: #F3DFD7;
+    --amber: #A97A2A;
+    --amber-soft: #F1E4C9;
+    --slate: #566172;
+    --slate-soft: #DEE4EC;
+    --shadow: rgba(31, 42, 34, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #1B211B; --paper-raised: #232B22; --ink: #E7ECE1; --ink-soft: #AAB6A9;
+      --rule: #3A4438; --teal: #6FC2C0; --teal-soft: #23332F; --coral: #E08A73;
+      --coral-soft: #3A2620; --amber: #D8AF6E; --amber-soft: #362B18; --slate: #9FB0C6;
+      --slate-soft: #232B33; --shadow: rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #1B211B; --paper-raised: #232B22; --ink: #E7ECE1; --ink-soft: #AAB6A9;
+    --rule: #3A4438; --teal: #6FC2C0; --teal-soft: #23332F; --coral: #E08A73;
+    --coral-soft: #3A2620; --amber: #D8AF6E; --amber-soft: #362B18; --slate: #9FB0C6;
+    --slate-soft: #232B33; --shadow: rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; line-height: 1.5; }
+  .page { max-width: 1000px; margin: 0 auto; padding: 40px 24px 90px; }
+  h1, h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; margin: 0; }
+
+  .masthead { margin-bottom: 10px; }
+  .masthead h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -0.01em; }
+  .tagline { color: var(--ink-soft); font-size: 15px; margin: 8px 0 0; max-width: 60ch; }
+  .source-note { font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 30px; }
+  .source-note b { color: var(--ink); font-weight: 600; }
+
+  .card { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 14px; padding: 26px; margin-bottom: 24px; }
+
+  /* ---- calculator hero ---- */
+  .calc-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 30px; }
+  @media (max-width: 780px) { .calc-grid { grid-template-columns: 1fr; } }
+  .calc-inputs h2 { font-size: 21px; margin-bottom: 4px; }
+  .calc-inputs > p { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field label span.val { font-weight: 400; color: var(--ink-soft); }
+  input[type="range"] { width: 100%; accent-color: var(--teal); height: 4px; }
+  select, .checkbox-row { width: 100%; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font-family: inherit; font-size: 14px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .checkbox-field { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .checkbox-field input { width: 16px; height: 16px; accent-color: var(--coral); }
+  .checkbox-field label { font-size: 13.5px; font-weight: 600; margin: 0; }
+
+  .calc-result { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-left: 1px solid var(--rule); padding-left: 30px; }
+  @media (max-width: 780px) { .calc-result { border-left: none; border-top: 1px solid var(--rule); padding-left: 0; padding-top: 24px; } }
+  .gauge-wrap { position: relative; width: 190px; height: 190px; margin-bottom: 8px; border-radius: 50%; transition: background 0.25s ease; }
+  .gauge-wrap::after { content: ""; position: absolute; inset: 16px; border-radius: 50%; background: var(--paper-raised); }
+  .gauge-number { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; }
+  .gauge-number .pct { font-family: 'Fraunces', serif; font-size: 34px; font-weight: 600; }
+  .gauge-number .lbl { font-size: 12px; color: var(--ink-soft); }
+  .calc-verdict { font-size: 14px; max-width: 30ch; color: var(--ink-soft); margin-top: 6px; }
+  .calc-verdict b { color: var(--ink); }
+
+  /* ---- kpi strip ---- */
+  .kpi-row { display: flex; gap: 28px; flex-wrap: wrap; }
+  .kpi { display: flex; flex-direction: column; }
+  .kpi-value { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 600; }
+  .kpi-label { font-size: 13px; color: var(--ink-soft); }
+
+  /* ---- feature importance ---- */
+  .chart-card h2 { font-size: 20px; margin-bottom: 4px; }
+  .chart-card > p { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 16px; }
+
+  /* ---- diverging bar chart (feature importance) ---- */
+  .imp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .imp-label { width: 150px; flex-shrink: 0; font-size: 12px; color: var(--ink-soft); text-align: right; }
+  .imp-track { position: relative; flex: 1; height: 16px; }
+  .imp-zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--rule); }
+  .imp-bar { position: absolute; top: 1px; height: 14px; border-radius: 3px; transition: width 0.2s ease; }
+  .imp-value { width: 48px; flex-shrink: 0; font-size: 12px; text-align: left; color: var(--ink-soft); }
+
+  /* ---- simple vertical bar chart (category churn rate) ---- */
+  .two-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .two-charts { grid-template-columns: 1fr; } }
+  .mini-chart h3 { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 0 0 12px; }
+  .vbar-wrap { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding-top: 20px; }
+  .vbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .vbar-fill-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .vbar-fill { width: 65%; max-width: 42px; background: var(--slate); border-radius: 5px 5px 0 0; transition: height 0.25s ease; position: relative; }
+  .vbar-val { font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; }
+  .vbar-lbl { font-size: 10.5px; color: var(--ink-soft); margin-top: 8px; text-align: center; line-height: 1.25; max-width: 68px; }
+
+  /* ---- table ---- */
+  .table-controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  #searchInput { flex: 1; min-width: 180px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px; font-family: inherit; }
+  #tierFilter { padding: 9px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px; font-family: inherit; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th { text-align: left; font-weight: 600; color: var(--ink-soft); padding: 8px 9px; border-bottom: 1px solid var(--rule); font-size: 12px; cursor: pointer; user-select: none; }
+  tbody td { padding: 8px 9px; border-bottom: 1px solid var(--rule); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--paper); }
+  .risk-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .risk-high { background: var(--coral-soft); color: var(--coral); }
+  .risk-mid { background: var(--amber-soft); color: var(--amber); }
+  .risk-low { background: var(--teal-soft); color: var(--teal); }
+  .actual-yes { color: var(--coral); font-weight: 600; }
+  .actual-no { color: var(--ink-soft); }
+  .table-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 12px; }
+
+  .detail-panel { position: fixed; top: 0; right: 0; height: 100%; width: min(360px, 90vw); background: var(--paper-raised); border-left: 1px solid var(--rule); padding: 26px 22px; overflow-y: auto; transform: translateX(100%); transition: transform 0.22s ease; box-shadow: -8px 0 24px var(--shadow); z-index: 20; }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel .close-btn { background: none; border: 1px solid var(--rule); border-radius: 8px; color: var(--ink-soft); font-size: 13px; padding: 5px 10px; cursor: pointer; font-family: inherit; margin-bottom: 16px; }
+  .detail-panel h3 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0 0 14px; }
+  .detail-gauge { text-align: center; margin-bottom: 16px; }
+  .detail-gauge .pct { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; }
+  .detail-gauge .lbl { font-size: 12px; color: var(--ink-soft); }
+  .factor-list { margin-bottom: 16px; }
+  .factor-list h4 { font-size: 13px; margin: 0 0 8px; color: var(--ink-soft); font-weight: 600; }
+  .factor-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+  .factor-row .tag { padding: 2px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+  .factor-up { background: var(--coral-soft); color: var(--coral); }
+  .factor-down { background: var(--teal-soft); color: var(--teal); }
+  .raw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 12.5px; color: var(--ink-soft); margin-top: 14px; }
+  .raw-grid div b { color: var(--ink); display: block; font-size: 13.5px; font-weight: 600; }
+
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 15; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  footer { color: var(--ink-soft); font-size: 12.5px; margin-top: 30px; max-width: 62ch; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <h1>Churn Signal</h1>
+    <p class="tagline">Model regresi logistik terlatih dari data transaksi e-commerce asli, untuk memprediksi dan menjelaskan risiko pelanggan berhenti belanja.</p>
+  </header>
+  <p class="source-note">Dilatih dari <b>3.941 pelanggan</b> di dataset e-commerce yang diunggah pengguna · AUC validasi <b id="aucNote">–</b> · fitur: tenure, jarak gudang, perangkat terdaftar, skor kepuasan, jumlah alamat, komplain, hari sejak order terakhir, cashback, kategori favorit, status pernikahan.</p>
+
+  <section class="card">
+    <div class="calc-grid">
+      <div class="calc-inputs">
+        <h2>Coba profil pelanggan</h2>
+        <p>Geser dan ubah nilainya — probabilitas churn dihitung ulang langsung pakai koefisien model yang sudah dilatih.</p>
+
+        <div class="field">
+          <label>Tenure (bulan berlangganan) <span class="val" id="valTenure">10</span></label>
+          <input type="range" id="inTenure" min="0" max="61" value="10">
+        </div>
+        <div class="field">
+          <label>Hari sejak order terakhir <span class="val" id="valRecency">4</span></label>
+          <input type="range" id="inRecency" min="0" max="46" value="4">
+        </div>
+        <div class="field">
+          <label>Jarak gudang ke rumah (km) <span class="val" id="valWarehouse">16</span></label>
+          <input type="range" id="inWarehouse" min="5" max="127" value="16">
+        </div>
+        <div class="field">
+          <label>Cashback rata-rata (Rp ribu) <span class="val" id="valCashback">177</span></label>
+          <input type="range" id="inCashback" min="0" max="325" value="177">
+        </div>
+        <div class="field">
+          <label>Skor kepuasan (1–5) <span class="val" id="valSat">3</span></label>
+          <input type="range" id="inSat" min="1" max="5" value="3">
+        </div>
+        <div class="field">
+          <label>Jumlah alamat terdaftar <span class="val" id="valAddr">4</span></label>
+          <input type="range" id="inAddr" min="1" max="22" value="4">
+        </div>
+        <div class="field">
+          <label>Perangkat terdaftar <span class="val" id="valDevice">4</span></label>
+          <input type="range" id="inDevice" min="1" max="6" value="4">
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label>Kategori favorit</label>
+            <select id="inCat"></select>
+          </div>
+          <div class="field">
+            <label>Status pernikahan</label>
+            <select id="inMarital"></select>
+          </div>
+        </div>
+        <div class="checkbox-field">
+          <input type="checkbox" id="inComplain">
+          <label for="inComplain">Pernah komplain</label>
+        </div>
+      </div>
+
+      <div class="calc-result">
+        <div class="gauge-wrap" id="gaugeWrap">
+          <div class="gauge-number"><span class="pct" id="calcPct">–</span><span class="lbl">probabilitas churn</span></div>
+        </div>
+        <p class="calc-verdict" id="calcVerdict">Geser slider untuk mulai.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="kpi-row">
+      <div class="kpi"><span class="kpi-value" id="kpiTotal">–</span><span class="kpi-label">pelanggan dianalisis</span></div>
+      <div class="kpi"><span class="kpi-value" id="kpiChurnRate">–</span><span class="kpi-label">churn rate aktual</span></div>
+      <div class="kpi"><span class="kpi-value" id="kpiTopDriver">–</span><span class="kpi-label">pendorong risiko terbesar</span></div>
+      <div class="kpi"><span class="kpi-value" id="kpiAuc">–</span><span class="kpi-label">AUC model (data uji)</span></div>
+    </div>
+  </section>
+
+  <section class="card chart-card">
+    <h2>Apa yang paling mendorong churn</h2>
+    <p>Koefisien model setelah fitur numerik distandardisasi — batang ke kanan (koral) menaikkan risiko, ke kiri (teal) menurunkannya.</p>
+    <div id="importanceChart"></div>
+  </section>
+
+  <section class="card chart-card">
+    <h2>Churn rate berdasarkan profil pelanggan</h2>
+    <p>Perbandingan churn rate aktual antar kategori favorit belanja dan status pernikahan.</p>
+    <div class="two-charts">
+      <div class="mini-chart"><h3>Kategori favorit</h3><div class="vbar-wrap" id="catChart"></div></div>
+      <div class="mini-chart"><h3>Status pernikahan</h3><div class="vbar-wrap" id="maritalChart"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="font-size:20px;margin-bottom:14px;">Sampel pelanggan (220 dari 3.941)</h2>
+    <div class="table-controls">
+      <input type="text" id="searchInput" placeholder="Cari kategori favorit…" aria-label="Search">
+      <select id="tierFilter">
+        <option value="">Semua tingkat risiko</option>
+        <option value="high">Risiko tinggi</option>
+        <option value="mid">Risiko sedang</option>
+        <option value="low">Risiko rendah</option>
+      </select>
+    </div>
+    <table id="customerTable">
+      <thead>
+        <tr>
+          <th data-k="Tenure">Tenure</th>
+          <th data-k="PreferedOrderCat">Kategori</th>
+          <th data-k="DaySinceLastOrder">Hari terakhir order</th>
+          <th data-k="Complain">Komplain</th>
+          <th data-k="Churn">Churn aktual</th>
+          <th data-k="PredProba">Prediksi risiko</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <p class="table-note">"Churn aktual" adalah label sebenarnya dari data historis; "Prediksi risiko" adalah keluaran model. Klik baris untuk lihat rincian faktor per pelanggan.</p>
+  </section>
+
+  <footer>
+    Model regresi logistik dilatih di Python (scikit-learn) dari file CSV yang diunggah pengguna, lalu koefisiennya di-export ke halaman ini sehingga prediksi dan penjelasan faktor dihitung langsung di browser — tanpa server tambahan.
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="detail-panel" id="detailPanel" aria-hidden="true">
+  <button class="close-btn" id="closeDetail">Tutup</button>
+  <h3>Rincian pelanggan</h3>
+  <div class="detail-gauge">
+    <span class="pct" id="detailPct">–</span>
+    <div class="lbl">probabilitas churn model</div>
+  </div>
+  <div class="factor-list">
+    <h4>Faktor paling berpengaruh</h4>
+    <div id="factorRows"></div>
+  </div>
+  <div class="raw-grid" id="rawGrid"></div>
+</aside>
+
+<script id="embedded-data" type="application/json">{"model": {"intercept": -2.428899243623574, "coefs": {"Tenure": -2.126108500813284, "WarehouseToHome": 0.3406277400436723, "NumberOfDeviceRegistered": 0.3869339833178689, "SatisfactionScore": 0.25000854332305844, "NumberOfAddress": 0.5088155901386755, "Complain": 0.8650426968257271, "DaySinceLastOrder": -0.09466580128282698, "CashbackAmount": -0.2331614056988292, "PreferedOrderCat_Grocery": -0.16821973884721542, "PreferedOrderCat_Laptop & Accessory": -1.4915275206743595, "PreferedOrderCat_Mobile": -0.44768321094338726, "PreferedOrderCat_Mobile Phone": -0.6520128926596035, "PreferedOrderCat_Others": 1.7243350107013369, "MaritalStatus_Married": -0.48375821612879427, "MaritalStatus_Single": 0.7269627129916403}, "means": {"Tenure": 10.177711738484398, "WarehouseToHome": 15.713818722139672, "NumberOfDeviceRegistered": 3.698959881129272, "SatisfactionScore": 3.0942050520059436, "NumberOfAddress": 4.296582466567608, "Complain": 0.2835066864784547, "DaySinceLastOrder": 4.780089153046062, "CashbackAmount": 179.77472511144128}, "stds": {"Tenure": 8.512942660496405, "WarehouseToHome": 8.513705245098768, "NumberOfDeviceRegistered": 1.0240924115600936, "SatisfactionScore": 1.3811557696228833, "NumberOfAddress": 2.6262424554313952, "Complain": 0.45076715592899463, "DaySinceLastOrder": 3.68583696948905, "CashbackAmount": 48.293472217475454}, "totalCustomers": 3365, "churnRate": 0.1515601783060921, "auc": 0.8815287936540641, "catChurnRate": {"Fashion": 0.15274463007159905, "Grocery": 0.038314176245210725, "Laptop & Accessory": 0.09375, "Mobile": 0.23170731707317074, "Mobile Phone": 0.27582159624413144, "Others": 0.0670391061452514}, "maritalChurnRate": {"Divorced": 0.13877551020408163, "Married": 0.0933786078098472, "Single": 0.25}}, "sample": [{"Tenure": 5.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 200.47, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 156.96, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 149.99, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 22.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 147.88, "Churn": 0}, {"Tenure": 15.0, "WarehouseToHome": 35.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 145.56, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 152.05, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 6.0, "CashbackAmount": 165.28, "Churn": 0}, {"Tenure": 22.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Others", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 286.65, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 191.44, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 9.0, "CashbackAmount": 253.08, "Churn": 0}, {"Tenure": 22.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Others", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 307.65, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 20.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 9, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 154.67, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 173.51, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 166.67, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 161.46, "Churn": 1}, {"Tenure": 8.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 129.77, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 24.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 156.89, "Churn": 0}, {"Tenure": 18.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 175.33, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 22.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 7, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 179.45, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 20.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 180.62, "Churn": 0}, {"Tenure": 27.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 13.0, "CashbackAmount": 200.25, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 34.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Grocery", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 11.0, "CashbackAmount": 233.2, "Churn": 0}, {"Tenure": 28.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 6.0, "CashbackAmount": 184.4, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 28.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 7.0, "CashbackAmount": 161.79, "Churn": 1}, {"Tenure": 9.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 196.99, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 6, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 134.64, "Churn": 1}, {"Tenure": 19.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 5.0, "CashbackAmount": 182.69, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 146.15, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 270.07, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 172.71, "Churn": 0}, {"Tenure": 27.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 243.36, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Others", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 322.4, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 190.02, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 187.2, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 135.52, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 8.0, "CashbackAmount": 193.34, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 134.91, "Churn": 0}, {"Tenure": 15.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 129.36, "Churn": 0}, {"Tenure": 23.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 278.79, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 135.78, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 28.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 151.78, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 147.18, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 2, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 174.36, "Churn": 0}, {"Tenure": 27.0, "WarehouseToHome": 5.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 137.8, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 136.81, "Churn": 0}, {"Tenure": 21.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 175.7, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 165.13, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 199.91, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 33.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 9.0, "CashbackAmount": 181.17, "Churn": 1}, {"Tenure": 20.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Grocery", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 257.25, "Churn": 0}, {"Tenure": 30.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 257.87, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 198.79, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 11, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 159.68, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 36.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 159.79, "Churn": 1}, {"Tenure": 3.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 164.83, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 162.6, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 146.15, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 177.96, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 20.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 6.0, "CashbackAmount": 127.56, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 23.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 1, "DaySinceLastOrder": 0.0, "CashbackAmount": 127.41, "Churn": 1}, {"Tenure": 4.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 145.64, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 171.21, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 177.57, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 24.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 11, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 149.37, "Churn": 1}, {"Tenure": 13.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 163.77, "Churn": 0}, {"Tenure": 22.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Others", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 286.65, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 196.04, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 34.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 193.83, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 176.75, "Churn": 0}, {"Tenure": 26.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Grocery", "SatisfactionScore": 5, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 17.0, "CashbackAmount": 293.56, "Churn": 0}, {"Tenure": 21.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 154.86, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 197.64, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 34.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 8.0, "CashbackAmount": 183.13, "Churn": 1}, {"Tenure": 23.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Others", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 316.61, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 159.91, "Churn": 0}, {"Tenure": 28.0, "WarehouseToHome": 18.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 13.0, "CashbackAmount": 285.32, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Divorced", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 153.19, "Churn": 0}, {"Tenure": 14.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 162.3, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 150.93, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 180.62, "Churn": 0}, {"Tenure": 18.0, "WarehouseToHome": 35.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 18.0, "CashbackAmount": 288.28, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 13.0, "CashbackAmount": 172.59, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 131.17, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 19.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 11, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 171.63, "Churn": 0}, {"Tenure": 26.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 275.84, "Churn": 0}, {"Tenure": 26.0, "WarehouseToHome": 29.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 242.75, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 27.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 11.0, "CashbackAmount": 163.12, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 167.35, "Churn": 1}, {"Tenure": 9.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 200.96, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 199.57, "Churn": 0}, {"Tenure": 19.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 278.61, "Churn": 0}, {"Tenure": 31.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 6.0, "CashbackAmount": 176.71, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 138.12, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 123.13, "Churn": 1}, {"Tenure": 8.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 165.33, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 155.05, "Churn": 0}, {"Tenure": 15.0, "WarehouseToHome": 35.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 142.72, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 9, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 198.51, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 19.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 161.34, "Churn": 1}, {"Tenure": 24.0, "WarehouseToHome": 36.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 295.46, "Churn": 0}, {"Tenure": 26.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 5.0, "CashbackAmount": 204.69, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 154.76, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 142.94, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 149.04, "Churn": 1}, {"Tenure": 2.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 160.91, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 157.31, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 150.71, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 192.25, "Churn": 0}, {"Tenure": 22.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Others", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 321.65, "Churn": 0}, {"Tenure": 22.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 151.3, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 163.38, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 5.0, "CashbackAmount": 152.25, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Mobile", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 127.91, "Churn": 0}, {"Tenure": 23.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 234.65, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 164.65, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 176.54, "Churn": 1}, {"Tenure": 10.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 188.34, "Churn": 0}, {"Tenure": 18.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Others", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 14.0, "CashbackAmount": 316.9, "Churn": 0}, {"Tenure": 27.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Grocery", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 290.98, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 159.33, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 7.0, "CashbackAmount": 185.74, "Churn": 1}, {"Tenure": 21.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Others", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 308.0, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 156.8, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Married", "NumberOfAddress": 9, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 188.47, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 196.99, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 140.33, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 141.89, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 152.18, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 161.42, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 9.0, "CashbackAmount": 152.28, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 35.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 143.06, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 11.0, "CashbackAmount": 186.33, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 4.0, "CashbackAmount": 152.82, "Churn": 0}, {"Tenure": 27.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 235.49, "Churn": 0}, {"Tenure": 24.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 231.42, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 0.0, "CashbackAmount": 131.72, "Churn": 1}, {"Tenure": 0.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 152.06, "Churn": 0}, {"Tenure": 19.0, "WarehouseToHome": 32.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 184.06, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 20.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 145.96, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 152.49, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 130.57, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 150.0, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 209.03, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Others", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 283.0, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Divorced", "NumberOfAddress": 9, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 149.04, "Churn": 1}, {"Tenure": 14.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 1, "PreferedOrderCat": "Fashion", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 183.92, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 241.31, "Churn": 0}, {"Tenure": 14.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 153.09, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 25.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 173.1, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 36.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 149.06, "Churn": 0}, {"Tenure": 15.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 276.65, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 27.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 194.32, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 152.42, "Churn": 1}, {"Tenure": 1.0, "WarehouseToHome": 29.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 6, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 146.32, "Churn": 1}, {"Tenure": 20.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 159.23, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 13.0, "CashbackAmount": 232.37, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 23.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 201.32, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 11.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 199.36, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 138.67, "Churn": 0}, {"Tenure": 2.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 173.55, "Churn": 1}, {"Tenure": 0.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 142.56, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 166.05, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 1, "DaySinceLastOrder": 7.0, "CashbackAmount": 149.98, "Churn": 0}, {"Tenure": 6.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 179.7, "Churn": 0}, {"Tenure": 29.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Others", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 16.0, "CashbackAmount": 312.22, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 5, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 186.42, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 147.69, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 150.92, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 152.28, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 32.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 166.96, "Churn": 1}, {"Tenure": 14.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 10, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 161.17, "Churn": 0}, {"Tenure": 15.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Others", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 319.19, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 10.0, "CashbackAmount": 184.57, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 3.0, "CashbackAmount": 151.59, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 2, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 8.0, "CashbackAmount": 126.86, "Churn": 1}, {"Tenure": 27.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 4.0, "CashbackAmount": 205.02, "Churn": 0}, {"Tenure": 3.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Fashion", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 171.4, "Churn": 0}, {"Tenure": 25.0, "WarehouseToHome": 33.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 18.0, "CashbackAmount": 288.07, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 144.0, "Churn": 1}, {"Tenure": 12.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 141.27, "Churn": 0}, {"Tenure": 5.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 6.0, "CashbackAmount": 154.7, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 154.29, "Churn": 0}, {"Tenure": 11.0, "WarehouseToHome": 26.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 155.22, "Churn": 0}, {"Tenure": 18.0, "WarehouseToHome": 29.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 8.0, "CashbackAmount": 136.33, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 31.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 1, "DaySinceLastOrder": 1.0, "CashbackAmount": 156.61, "Churn": 1}, {"Tenure": 5.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 153.96, "Churn": 0}, {"Tenure": 19.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 0.0, "CashbackAmount": 152.58, "Churn": 0}, {"Tenure": 20.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 291.06, "Churn": 0}, {"Tenure": 30.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Grocery", "SatisfactionScore": 4, "MaritalStatus": "Divorced", "NumberOfAddress": 6, "Complain": 1, "DaySinceLastOrder": 10.0, "CashbackAmount": 259.02, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 28.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 182.36, "Churn": 0}, {"Tenure": 24.0, "WarehouseToHome": 24.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Fashion", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 257.69, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 18.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 169.9, "Churn": 0}, {"Tenure": 21.0, "WarehouseToHome": 12.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 142.4, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 32.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 154.42, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 151.1, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 14.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 149.04, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 156.74, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 8, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 147.58, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 22.0, "NumberOfDeviceRegistered": 6, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 179.06, "Churn": 0}, {"Tenure": 28.0, "WarehouseToHome": 24.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 4, "MaritalStatus": "Single", "NumberOfAddress": 4, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 268.35, "Churn": 0}, {"Tenure": 23.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 5.0, "CashbackAmount": 239.73, "Churn": 0}, {"Tenure": 23.0, "WarehouseToHome": 27.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 12.0, "CashbackAmount": 190.67, "Churn": 0}, {"Tenure": 25.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 2, "MaritalStatus": "Divorced", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 270.99, "Churn": 0}, {"Tenure": 23.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Grocery", "SatisfactionScore": 1, "MaritalStatus": "Married", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 273.99, "Churn": 0}, {"Tenure": 8.0, "WarehouseToHome": 29.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 4, "Complain": 1, "DaySinceLastOrder": 2.0, "CashbackAmount": 140.14, "Churn": 0}, {"Tenure": 25.0, "WarehouseToHome": 13.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 153.38, "Churn": 0}, {"Tenure": 9.0, "WarehouseToHome": 6.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 5.0, "CashbackAmount": 152.28, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 15.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Single", "NumberOfAddress": 10, "Complain": 0, "DaySinceLastOrder": 13.0, "CashbackAmount": 234.99, "Churn": 0}, {"Tenure": 10.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 8.0, "CashbackAmount": 194.34, "Churn": 0}, {"Tenure": 12.0, "WarehouseToHome": 17.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 1, "MaritalStatus": "Single", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 4.0, "CashbackAmount": 181.66, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 22.0, "NumberOfDeviceRegistered": 2, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 1, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 156.61, "Churn": 0}, {"Tenure": 7.0, "WarehouseToHome": 32.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 2.0, "CashbackAmount": 170.39, "Churn": 0}, {"Tenure": 1.0, "WarehouseToHome": 9.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 0, "DaySinceLastOrder": 1.0, "CashbackAmount": 148.41, "Churn": 0}, {"Tenure": 19.0, "WarehouseToHome": 30.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 5, "MaritalStatus": "Married", "NumberOfAddress": 3, "Complain": 1, "DaySinceLastOrder": 9.0, "CashbackAmount": 161.33, "Churn": 0}, {"Tenure": 19.0, "WarehouseToHome": 21.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Others", "SatisfactionScore": 4, "MaritalStatus": "Married", "NumberOfAddress": 6, "Complain": 0, "DaySinceLastOrder": 3.0, "CashbackAmount": 290.81, "Churn": 0}, {"Tenure": 13.0, "WarehouseToHome": 10.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Others", "SatisfactionScore": 3, "MaritalStatus": "Divorced", "NumberOfAddress": 2, "Complain": 0, "DaySinceLastOrder": 9.0, "CashbackAmount": 290.33, "Churn": 0}, {"Tenure": 17.0, "WarehouseToHome": 16.0, "NumberOfDeviceRegistered": 4, "PreferedOrderCat": "Laptop & Accessory", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 5, "Complain": 1, "DaySinceLastOrder": 8.0, "CashbackAmount": 181.79, "Churn": 0}, {"Tenure": 0.0, "WarehouseToHome": 22.0, "NumberOfDeviceRegistered": 5, "PreferedOrderCat": "Mobile Phone", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 7.0, "CashbackAmount": 139.19, "Churn": 1}, {"Tenure": 19.0, "WarehouseToHome": 7.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Mobile", "SatisfactionScore": 5, "MaritalStatus": "Single", "NumberOfAddress": 7, "Complain": 0, "DaySinceLastOrder": 7.0, "CashbackAmount": 134.23, "Churn": 0}, {"Tenure": 4.0, "WarehouseToHome": 8.0, "NumberOfDeviceRegistered": 3, "PreferedOrderCat": "Fashion", "SatisfactionScore": 3, "MaritalStatus": "Married", "NumberOfAddress": 2, "Complain": 1, "DaySinceLastOrder": 6.0, "CashbackAmount": 198.52, "Churn": 0}]}</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('embedded-data').textContent);
+  const M = DATA.model;
+  const SAMPLE = DATA.sample;
+
+  const catList = ["Fashion","Grocery","Laptop & Accessory","Mobile","Mobile Phone","Others"];
+  const maritalList = ["Divorced","Married","Single"];
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  const fmtPct = p => (p * 100).toFixed(1) + "%";
+
+  // ---------- scoring function mirroring the trained sklearn pipeline ----------
+  function score(input) {
+    let z = M.intercept;
+    const contributions = [];
+    ["Tenure","WarehouseToHome","NumberOfDeviceRegistered","SatisfactionScore","NumberOfAddress","Complain","DaySinceLastOrder","CashbackAmount"].forEach(f => {
+      const raw = input[f];
+      const scaled = (raw - M.means[f]) / M.stds[f];
+      const contrib = M.coefs[f] * scaled;
+      z += contrib;
+      contributions.push({ label: humanLabel(f, raw), contrib });
+    });
+    const catKey = "PreferedOrderCat_" + input.PreferedOrderCat;
+    if (M.coefs[catKey] !== undefined) {
+      z += M.coefs[catKey];
+      contributions.push({ label: "Kategori favorit: " + input.PreferedOrderCat, contrib: M.coefs[catKey] });
+    }
+    const marKey = "MaritalStatus_" + input.MaritalStatus;
+    if (M.coefs[marKey] !== undefined) {
+      z += M.coefs[marKey];
+      contributions.push({ label: "Status: " + input.MaritalStatus, contrib: M.coefs[marKey] });
+    }
+    const prob = 1 / (1 + Math.exp(-z));
+    return { prob, contributions };
+  }
+
+  function humanLabel(f, raw) {
+    const map = {
+      Tenure: `Tenure ${raw} bln`,
+      WarehouseToHome: `Jarak gudang ${raw} km`,
+      NumberOfDeviceRegistered: `${raw} perangkat terdaftar`,
+      SatisfactionScore: `Skor kepuasan ${raw}`,
+      NumberOfAddress: `${raw} alamat terdaftar`,
+      Complain: raw ? "Pernah komplain" : "Tidak pernah komplain",
+      DaySinceLastOrder: `${raw} hari sejak order terakhir`,
+      CashbackAmount: `Cashback Rp${raw}rb`,
+    };
+    return map[f] || f;
+  }
+
+  // ---------- populate calculator selects ----------
+  const inCat = document.getElementById("inCat");
+  catList.forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; inCat.appendChild(o); });
+  inCat.value = "Mobile Phone";
+  const inMarital = document.getElementById("inMarital");
+  maritalList.forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; inMarital.appendChild(o); });
+  inMarital.value = "Married";
+
+  // ---------- gauge (pure CSS conic-gradient ring, no external chart lib) ----------
+  const gaugeWrap = document.getElementById("gaugeWrap");
+  function setGauge(prob, color) {
+    const deg = Math.max(0, Math.min(1, prob)) * 360;
+    gaugeWrap.style.background = `conic-gradient(${color} ${deg}deg, ${cssVar("--rule")} ${deg}deg)`;
+  }
+  setGauge(0, cssVar("--teal"));
+
+  function updateCalculator() {
+    const input = {
+      Tenure: Number(document.getElementById("inTenure").value),
+      DaySinceLastOrder: Number(document.getElementById("inRecency").value),
+      WarehouseToHome: Number(document.getElementById("inWarehouse").value),
+      CashbackAmount: Number(document.getElementById("inCashback").value),
+      SatisfactionScore: Number(document.getElementById("inSat").value),
+      NumberOfAddress: Number(document.getElementById("inAddr").value),
+      NumberOfDeviceRegistered: Number(document.getElementById("inDevice").value),
+      PreferedOrderCat: inCat.value,
+      MaritalStatus: inMarital.value,
+      Complain: document.getElementById("inComplain").checked ? 1 : 0,
+    };
+    document.getElementById("valTenure").textContent = input.Tenure;
+    document.getElementById("valRecency").textContent = input.DaySinceLastOrder;
+    document.getElementById("valWarehouse").textContent = input.WarehouseToHome;
+    document.getElementById("valCashback").textContent = input.CashbackAmount;
+    document.getElementById("valSat").textContent = input.SatisfactionScore;
+    document.getElementById("valAddr").textContent = input.NumberOfAddress;
+    document.getElementById("valDevice").textContent = input.NumberOfDeviceRegistered;
+
+    const { prob } = score(input);
+    document.getElementById("calcPct").textContent = fmtPct(prob);
+    const color = prob >= 0.6 ? cssVar("--coral") : prob >= 0.35 ? cssVar("--amber") : cssVar("--teal");
+    setGauge(prob, color);
+
+    const verdict = document.getElementById("calcVerdict");
+    if (prob >= 0.6) verdict.innerHTML = `<b>Risiko tinggi.</b> Kombinasi profil ini mirip pelanggan yang cenderung berhenti belanja.`;
+    else if (prob >= 0.35) verdict.innerHTML = `<b>Risiko sedang.</b> Beberapa faktor mengarah ke churn, worth dipantau.`;
+    else verdict.innerHTML = `<b>Risiko rendah.</b> Profil ini mirip pelanggan yang bertahan.`;
+  }
+  ["inTenure","inRecency","inWarehouse","inCashback","inSat","inAddr","inDevice"].forEach(id => document.getElementById(id).addEventListener("input", updateCalculator));
+  inCat.addEventListener("change", updateCalculator);
+  inMarital.addEventListener("change", updateCalculator);
+  document.getElementById("inComplain").addEventListener("change", updateCalculator);
+  updateCalculator();
+
+  // ---------- KPIs ----------
+  document.getElementById("kpiTotal").textContent = M.totalCustomers.toLocaleString("id-ID");
+  document.getElementById("kpiChurnRate").textContent = fmtPct(M.churnRate);
+  document.getElementById("kpiAuc").textContent = M.auc.toFixed(2);
+  document.getElementById("aucNote").textContent = M.auc.toFixed(2);
+  const topFeature = Object.entries(M.coefs).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+  document.getElementById("kpiTopDriver").textContent = topFeature[0].replace("PreferedOrderCat_", "").replace("MaritalStatus_", "");
+
+  // ---------- feature importance chart (pure DOM diverging bars, no external lib) ----------
+  const impEntries = Object.entries(M.coefs).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const maxAbs = Math.max(...impEntries.map(([, v]) => Math.abs(v)));
+  const impWrap = document.getElementById("importanceChart");
+  impEntries.forEach(([k, v]) => {
+    const label = k.replace("PreferedOrderCat_", "Kategori: ").replace("MaritalStatus_", "Status: ");
+    const pct = (Math.abs(v) / maxAbs) * 50;
+    const row = document.createElement("div");
+    row.className = "imp-row";
+    const barStyle = v >= 0
+      ? `left:50%; width:${pct}%; background:${cssVar("--coral")};`
+      : `left:${50 - pct}%; width:${pct}%; background:${cssVar("--teal")};`;
+    row.innerHTML = `
+      <span class="imp-label">${label}</span>
+      <span class="imp-track"><span class="imp-zero"></span><span class="imp-bar" style="${barStyle}"></span></span>
+      <span class="imp-value">${v >= 0 ? "+" : ""}${v.toFixed(2)}</span>`;
+    impWrap.appendChild(row);
+  });
+
+  // ---------- churn rate by category (pure DOM vertical bars) ----------
+  function vBarChart(id, dataObj, sortDesc) {
+    const entries = Object.entries(dataObj).sort((a, b) => sortDesc ? b[1] - a[1] : 0);
+    const maxVal = Math.max(...entries.map(([, v]) => v));
+    const wrap = document.getElementById(id);
+    entries.forEach(([label, val]) => {
+      const heightPct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+      const col = document.createElement("div");
+      col.className = "vbar-col";
+      col.innerHTML = `
+        <div class="vbar-val">${(val * 100).toFixed(1)}%</div>
+        <div class="vbar-fill-wrap"><div class="vbar-fill" style="height:${heightPct}%;"></div></div>
+        <div class="vbar-lbl">${label}</div>`;
+      wrap.appendChild(col);
+    });
+  }
+  vBarChart("catChart", M.catChurnRate, true);
+  vBarChart("maritalChart", M.maritalChurnRate, true);
+
+  // ---------- table ----------
+  SAMPLE.forEach(c => { const s = score(c); c._pred = s.prob; c._contrib = s.contributions; });
+
+  function riskClass(p) { return p >= 0.6 ? "risk-high" : p >= 0.35 ? "risk-mid" : "risk-low"; }
+  function riskLabel(p) { return p >= 0.6 ? "Tinggi" : p >= 0.35 ? "Sedang" : "Rendah"; }
+  function riskTier(p) { return p >= 0.6 ? "high" : p >= 0.35 ? "mid" : "low"; }
+
+  let searchTerm = "", tierFilterVal = "", sortKey = "PredProba", sortDir = -1;
+
+  function filteredRows() {
+    return SAMPLE
+      .filter(c => c.PreferedOrderCat.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(c => !tierFilterVal || riskTier(c._pred) === tierFilterVal)
+      .sort((a, b) => {
+        const av = sortKey === "PredProba" ? a._pred : a[sortKey];
+        const bv = sortKey === "PredProba" ? b._pred : b[sortKey];
+        if (av < bv) return -1 * sortDir;
+        if (av > bv) return 1 * sortDir;
+        return 0;
+      });
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+    filteredRows().slice(0, 80).forEach(c => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${c.Tenure} bln</td>
+        <td>${c.PreferedOrderCat}</td>
+        <td>${c.DaySinceLastOrder} hari</td>
+        <td>${c.Complain ? "Ya" : "Tidak"}</td>
+        <td><span class="${c.Churn ? 'actual-yes' : 'actual-no'}">${c.Churn ? "Churn" : "Aktif"}</span></td>
+        <td><span class="risk-pill ${riskClass(c._pred)}">${riskLabel(c._pred)} · ${fmtPct(c._pred)}</span></td>`;
+      tr.addEventListener("click", () => openDetail(c));
+      tbody.appendChild(tr);
+    });
+  }
+  document.querySelectorAll("#customerTable thead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.k;
+      sortDir = (sortKey === k) ? -sortDir : -1;
+      sortKey = k;
+      renderTable();
+    });
+  });
+  document.getElementById("searchInput").addEventListener("input", e => { searchTerm = e.target.value; renderTable(); });
+  document.getElementById("tierFilter").addEventListener("change", e => { tierFilterVal = e.target.value; renderTable(); });
+
+  function openDetail(c) {
+    document.getElementById("detailPct").textContent = fmtPct(c._pred);
+    const rows = document.getElementById("factorRows");
+    rows.innerHTML = "";
+    const sorted = [...c._contrib].sort((a, b) => Math.abs(b.contrib) - Math.abs(a.contrib)).slice(0, 5);
+    sorted.forEach(f => {
+      const div = document.createElement("div");
+      div.className = "factor-row";
+      div.innerHTML = `<span>${f.label}</span><span class="tag ${f.contrib >= 0 ? 'factor-up' : 'factor-down'}">${f.contrib >= 0 ? '+' : ''}${f.contrib.toFixed(2)}</span>`;
+      rows.appendChild(div);
+    });
+    document.getElementById("rawGrid").innerHTML = `
+      <div><b>${c.Tenure}</b>tenure (bln)</div>
+      <div><b>${c.DaySinceLastOrder}</b>hari sejak order</div>
+      <div><b>${c.NumberOfAddress}</b>alamat terdaftar</div>
+      <div><b>${c.NumberOfDeviceRegistered}</b>perangkat</div>
+      <div><b>${c.SatisfactionScore}</b>skor kepuasan</div>
+      <div><b>Rp${c.CashbackAmount}rb</b>cashback</div>`;
+    document.getElementById("detailPanel").classList.add("open");
+    document.getElementById("detailPanel").setAttribute("aria-hidden", "false");
+    document.getElementById("scrim").classList.add("open");
+  }
+  function closeDetail() {
+    document.getElementById("detailPanel").classList.remove("open");
+    document.getElementById("detailPanel").setAttribute("aria-hidden", "true");
+    document.getElementById("scrim").classList.remove("open");
+  }
+  document.getElementById("closeDetail").addEventListener("click", closeDetail);
+  document.getElementById("scrim").addEventListener("click", closeDetail);
+
+  renderTable();
+})();
+</script>
+</body>
+</html>
